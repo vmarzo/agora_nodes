@@ -35,51 +35,6 @@ function bp_profile_menu_posts() {
 add_action('bp_setup_nav', 'bp_profile_menu_posts', 301);
 
 /**
- * Build two sub menu items, the first is showing by default
- * @author Nacho Abejaro
- */
-function bp_profile_submenu_posts() {
-    $publishCount = get_user_posts_count('publish');
-    $pendingCount = get_user_posts_count('pending');
-    $draftCount = get_user_posts_count('draft');
-    $parent_slug = 'myposts';
-
-    bp_core_new_subnav_item(
-            array(
-                'name' => __('Published', 'agora-functions') . '<span>' . $publishCount . '</span>',
-                'slug' => 'mypublished',
-                'parent_url' => bp_displayed_user_domain() . $parent_slug . '/',
-                'parent_slug' => $parent_slug,
-                'position' => 10,
-                'screen_function' => 'mb_author_posts' // the function is declared below
-            )
-    );
-
-    bp_core_new_subnav_item(
-            array(
-                'name' => __('Pending Review', 'agora-functions') . '<span>' . $pendingCount . '</span>',
-                'slug' => 'myunder-review',
-                'parent_url' => bp_displayed_user_domain() . $parent_slug . '/',
-                'parent_slug' => $parent_slug,
-                'position' => 20,
-                'screen_function' => 'mb_author_pending' // the function is declared below
-            )
-    );
-
-    bp_core_new_subnav_item(
-            array(
-                'name' => __('Drafts', 'agora-functions') . '<span>' . $draftCount . '</span>',
-                'slug' => 'mydrafts',
-                'parent_url' => bp_displayed_user_domain() . $parent_slug . '/',
-                'parent_slug' => $parent_slug,
-                'position' => 30,
-                'screen_function' => 'mb_author_drafts' // the function is declared below
-            )
-    );
-}
-add_action('bp_setup_nav', 'bp_profile_submenu_posts', 302);
-
-/**
  * Manage the first sub item
  * First function is the screen_function
  * Second function displays the content
@@ -230,20 +185,31 @@ function limit_text($text, $limitwrd) {
 }
 
 /**
- * If user is not logged in, redirects at login screen on BuddyPress tabs
- * @author Nacho Abejaro
+ * If user is not logged in, not allow access and redirect at login page
+ *
+ * @author Xavier Nieto
  */
-function members_logged_in_only() {
+function check_url_access_buddypress(){
+
     $uid = get_current_user_id();
 
-    if ($uid == 0) {
-        //Instead of using wp_redirect, echo location using meta
-        $location = home_url() . "/wp-login.php";
-        echo "<meta http-equiv='refresh' content='0;url=$location'/>";
-    }
-}
+    $restrictedPages = array(
+        '/membres/admin/docs',
+        '/membres/admin/myposts',
+    );
 
-add_filter('bp_before_member_home_content', 'members_logged_in_only');
+    if ($uid == 0) {
+        $actual_link = $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
+        foreach ( $restrictedPages as $page ) {
+            if ( ( strpos( $actual_link, $page ) !== false ) ){
+                wp_redirect( wp_login_url() );
+                exit();
+            }
+        }
+    }
+
+}
+add_action('parse_query', 'check_url_access_buddypress');
 
 /**
  * Disable gravatar.com calls on buddypress.
