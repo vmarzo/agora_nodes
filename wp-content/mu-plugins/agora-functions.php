@@ -55,27 +55,30 @@ function bp_profile_submenu_posts() {
             )
     );
 
-    bp_core_new_subnav_item(
-            array(
-                'name' => __('Pending Review', 'agora-functions') . '<span>' . $pendingCount . '</span>',
-                'slug' => 'myunder-review',
-                'parent_url' => bp_displayed_user_domain() . $parent_slug . '/',
-                'parent_slug' => $parent_slug,
-                'position' => 20,
-                'screen_function' => 'mb_author_pending' // the function is declared below
-            )
-    );
+    // Hidden draft and pending articles
+    if ( is_xtec_super_admin() ){
+        bp_core_new_subnav_item(
+                array(
+                    'name' => __('Pending Review', 'agora-functions') . '<span>' . $pendingCount . '</span>',
+                    'slug' => 'myunder-review',
+                    'parent_url' => bp_displayed_user_domain() . $parent_slug . '/',
+                    'parent_slug' => $parent_slug,
+                    'position' => 20,
+                    'screen_function' => 'mb_author_pending' // the function is declared below
+                )
+        );
 
-    bp_core_new_subnav_item(
-            array(
-                'name' => __('Drafts', 'agora-functions') . '<span>' . $draftCount . '</span>',
-                'slug' => 'mydrafts',
-                'parent_url' => bp_displayed_user_domain() . $parent_slug . '/',
-                'parent_slug' => $parent_slug,
-                'position' => 30,
-                'screen_function' => 'mb_author_drafts' // the function is declared below
-            )
-    );
+        bp_core_new_subnav_item(
+                array(
+                    'name' => __('Drafts', 'agora-functions') . '<span>' . $draftCount . '</span>',
+                    'slug' => 'mydrafts',
+                    'parent_url' => bp_displayed_user_domain() . $parent_slug . '/',
+                    'parent_slug' => $parent_slug,
+                    'position' => 30,
+                    'screen_function' => 'mb_author_drafts' // the function is declared below
+                )
+        );
+    }
 }
 add_action('bp_setup_nav', 'bp_profile_submenu_posts', 302);
 
@@ -91,7 +94,7 @@ function mb_author_posts() {
 }
 
 function mb_show_posts() {
-	$user_id = bp_displayed_user_id();
+    $user_id = bp_displayed_user_id();
     $query = "author=$user_id&orderby=title&order=ASC";
     myTemplate($query);
 }
@@ -108,7 +111,7 @@ function mb_author_drafts() {
 }
 
 function mb_show_drafts() {
-	$user_id = bp_displayed_user_id();
+    $user_id = bp_displayed_user_id();
     $query = "author=$user_id&post_status=draft&orderby=title&order=ASC";
     myTemplate($query);
 }
@@ -120,14 +123,14 @@ function mb_show_drafts() {
  * @author Nacho Abejaro
  */
 function mb_author_pending() {
-	add_action('bp_template_content', 'mb_show_pending');
-	bp_core_load_template(apply_filters('bp_core_template_plugin', 'members/single/plugins'));
+    add_action('bp_template_content', 'mb_show_pending');
+    bp_core_load_template(apply_filters('bp_core_template_plugin', 'members/single/plugins'));
 }
 
 function mb_show_pending() {
-	$user_id = bp_displayed_user_id();
-	$query = "author=$user_id&post_status=pending&orderby=title&order=ASC";
-	myTemplate($query);
+    $user_id = bp_displayed_user_id();
+    $query = "author=$user_id&post_status=pending&orderby=title&order=ASC";
+    myTemplate($query);
 }
 
 /**
@@ -150,7 +153,7 @@ function myTemplate($query) {
             }
 
             echo '<div style="width: 100%; float: left; position: relative; margin-bottom: 5px;">';
-            echo '<div style="width: 100%; min-height: 90px; float: left; border-bottom: 2px solid #F2F0F0; background: white;	margin-left: 0px; position: relative;">';
+            echo '<div style="width: 100%; min-height: 90px; float: left; border-bottom: 2px solid #F2F0F0; background: white;  margin-left: 0px; position: relative;">';
             echo '<div style="max-width: 100px; max-height: 100px; float: left; margin-top: 10px; position: relative; width: 200%;" >';
             echo '<a href="' . get_edit_post_link() . '">';
             the_post_thumbnail('thumbnail');
@@ -229,21 +232,32 @@ function limit_text($text, $limitwrd) {
     return $text;
 }
 
+
 /**
- * If user is not logged in, redirects at login screen on BuddyPress tabs
- * @author Nacho Abejaro
+ * If user is not logged in, not allow access and redirect at login page
+ * @author Xavier Nieto
  */
-function members_logged_in_only() {
+function check_url_access_buddypress(){
+
     $uid = get_current_user_id();
 
-    if ($uid == 0) {
-        //Instead of using wp_redirect, echo location using meta
-        $location = home_url() . "/wp-login.php";
-        echo "<meta http-equiv='refresh' content='0;url=$location'/>";
-    }
-}
+    $restrictedPages = array(
+        '/membres/admin/docs',
+        '/membres/admin/myposts',
+    );
 
-add_filter('bp_before_member_home_content', 'members_logged_in_only');
+    if ($uid == 0) {
+        $actual_link = $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
+        foreach ( $restrictedPages as $page ) {
+            if ( ( strpos( $actual_link, $page ) !== false ) ){
+                wp_redirect( wp_login_url() );
+                exit();
+            }
+        }
+    }
+
+}
+add_action('parse_query', 'check_url_access_buddypress');
 
 /**
  * Disable gravatar.com calls on buddypress.
@@ -268,12 +282,12 @@ add_action('do_meta_boxes', 'agora_remove_post_meta_boxes');
  */
 add_action('wp_handle_upload', 'quota_control');
 function quota_control($results) {
-	if (isset($GLOBALS['diskPercentNodes'])&&($GLOBALS['diskPercentNodes'] >= 100)){
-		$file['error'] = __('You have exceeded your disk quota limit', 'agora-functions');
-		return $file;
-	}else {
-		return $results;
-	}
+    if (isset($GLOBALS['diskPercentNodes'])&&($GLOBALS['diskPercentNodes'] >= 100)){
+        $file['error'] = __('You have exceeded your disk quota limit', 'agora-functions');
+        return $file;
+    }else {
+        return $results;
+    }
 }
 
 /**
@@ -287,26 +301,26 @@ add_action('remove_stats', 'remove_old_stats');
  * @param int $post_id Post ID.
  */
 function restrict_post_deletion($post_ID){
-	$pagesList = array("Membres", "Pàgines d'inici", "Activitat", "Nodes");
-	$restricted_pages = array();
+    $pagesList = array("Membres", "Pàgines d'inici", "Activitat", "Nodes");
+    $restricted_pages = array();
 
     if (get_option('page_on_front')) {
         // Avoid delete page_on_front because frontpage is not shown if it doesnt exist
         array_push($restricted_pages, get_option('page_on_front'));
     }
-	if (!is_xtec_super_admin()) {
-		foreach ($pagesList as $pageTitle){
-			$page = get_page_by_title($pageTitle);
-			if ($page->ID) {
-				array_push($restricted_pages, $page->ID);
-			}
-		}
+    if (!is_xtec_super_admin()) {
+        foreach ($pagesList as $pageTitle){
+            $page = get_page_by_title($pageTitle);
+            if ($page->ID) {
+                array_push($restricted_pages, $page->ID);
+            }
+        }
 
-		if (in_array($post_ID, $restricted_pages)) {
-			$msg = __('The page you were trying to delete is protected.', 'agora-functions');
-			wp_die($msg);
-		}
-	}
+        if (in_array($post_ID, $restricted_pages)) {
+            $msg = __('The page you were trying to delete is protected.', 'agora-functions');
+            wp_die($msg);
+        }
+    }
 
 }
 add_action('wp_trash_post', 'restrict_post_deletion');
@@ -317,33 +331,33 @@ add_action('before_delete_post', 'restrict_post_deletion');
  * @author Nacho Abejaro
  */
 function force_post_title_init() {
-	wp_enqueue_script('jquery');
+    wp_enqueue_script('jquery');
 }
 
 function force_post_title() {
-	$msgError = __('The page name you were trying to create is protected.', 'agora-functions');
-	$msgNull = __('Page name is required.', 'agora-functions');
-	echo "<script type='text/javascript'>\n";
-	echo "
+    $msgError = __('The page name you were trying to create is protected.', 'agora-functions');
+    $msgNull = __('Page name is required.', 'agora-functions');
+    echo "<script type='text/javascript'>\n";
+    echo "
     jQuery('#publish').click(function(){
-		var title = jQuery('[id^=\"titlediv\"]').find('#title');
-		if (title.val() != '') {
-			var blackPagesList = ['moodle', 'moodle2', 'intranet'];
+        var title = jQuery('[id^=\"titlediv\"]').find('#title');
+        if (title.val() != '') {
+            var blackPagesList = ['moodle', 'moodle2', 'intranet'];
 
-			if (jQuery.inArray(title.val().toLowerCase(), blackPagesList) !== -1) {
-				alert ('".$msgError."');
-				return false;
-			}else {
-				// Title ok, do nothing
-				return true;
-			}
+            if (jQuery.inArray(title.val().toLowerCase(), blackPagesList) !== -1) {
+                alert ('".$msgError."');
+                return false;
+            }else {
+                // Title ok, do nothing
+                return true;
+            }
         }else {
-			alert ('".$msgNull."');
-			return false;
-		}
+            alert ('".$msgNull."');
+            return false;
+        }
     });
   ";
-	echo "</script>\n";
+    echo "</script>\n";
 }
 
 add_action('edit_form_advanced', 'force_post_title');
@@ -356,14 +370,14 @@ add_action('edit_page_form', 'force_post_title');
  * @author Xavier Nieto
  */
 function bbp_get_forum_doc_permalink_filter($permalink) {
-	
-	$url = $_SERVER["HTTP_HOST"] . $_SERVER["REQUEST_URI"];
-	
-	if ( strpos($url,'forum') !== false || strpos($url,'docs') !== false ) {
-		return preg_replace('/^http:/i', 'https:', $permalink);
-	}else {
-		return preg_replace('/^https:/i', 'http:', $permalink);
-	}
+    
+    $url = $_SERVER["HTTP_HOST"] . $_SERVER["REQUEST_URI"];
+    
+    if ( strpos($url,'forum') !== false || strpos($url,'docs') !== false ) {
+        return preg_replace('/^http:/i', 'https:', $permalink);
+    }else {
+        return preg_replace('/^https:/i', 'http:', $permalink);
+    }
 }
 
 add_filter('bbp_get_forum_permalink', 'bbp_get_forum_doc_permalink_filter');
@@ -380,10 +394,10 @@ add_filter('bp_docs_get_doc_link', 'bbp_get_forum_doc_permalink_filter');
  * @author Nacho Abejaro 
  */
 function unregister_AddToAny_widgets() {
-	if (!is_xtec_super_admin()) {
-		unregister_widget( 'A2A_SHARE_SAVE_Widget' );
-		unregister_widget( 'A2A_Follow_Widget' );
-	}
+    if (!is_xtec_super_admin()) {
+        unregister_widget( 'A2A_SHARE_SAVE_Widget' );
+        unregister_widget( 'A2A_Follow_Widget' );
+    }
 }
 add_action('widgets_init', 'unregister_AddToAny_widgets', 11);
 /**
@@ -392,22 +406,22 @@ add_action('widgets_init', 'unregister_AddToAny_widgets', 11);
  */
 function remove_general_bbpress_options(){
 
-	$restrictedPage = 'options-general.php?page=bbpress';
+    $restrictedPage = 'options-general.php?page=bbpress';
 
-	// Get current URL
-	$pageURL = 'http';
-	if ( array_key_exists('HTTPS', $_SERVER) && $_SERVER['HTTPS'] == 'on' ) {
-		$pageURL .= 's';
-	}
+    // Get current URL
+    $pageURL = 'http';
+    if ( array_key_exists('HTTPS', $_SERVER) && $_SERVER['HTTPS'] == 'on' ) {
+        $pageURL .= 's';
+    }
 
-	$pageURL .= '://'. $_SERVER['SERVER_NAME'] . $_SERVER['REQUEST_URI'];
+    $pageURL .= '://'. $_SERVER['SERVER_NAME'] . $_SERVER['REQUEST_URI'];
 
-	// Check if url contains the restricted page
-	$pos = strpos($pageURL, $restrictedPage);
+    // Check if url contains the restricted page
+    $pos = strpos($pageURL, $restrictedPage);
 
-	if ( !is_xtec_super_admin() && ($pos !== false) ) {
-		wp_die(__('You do not have permission to do that.'));
-	}
+    if ( !is_xtec_super_admin() && ($pos !== false) ) {
+        wp_die(__('You do not have permission to do that.'));
+    }
 }
 
 add_action('parse_query', 'remove_general_bbpress_options');
